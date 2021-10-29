@@ -20,7 +20,7 @@
   "config": {
     "html": "./frontend/src/index.html",
     "mjs": "./frontend/src/index.mjs",
-    "port": 4536
+    "port": 4522
   },
   "scripts": {
     "dev": "parcel $npm_package_config_html --port $npm_package_config_port --cache-dir ./.parcel-cache  --no-source-maps --dist-dir ./docs ",

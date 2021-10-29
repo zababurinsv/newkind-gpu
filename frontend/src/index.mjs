@@ -1,114 +1,47 @@
 import pkg from "../../package.json";
-import api from './modules/api/index.mjs'
-import init from './modules/fs/main.mjs'
-import bytecode from './modules/fs/wasmBinary.mjs'
-import isEmpty from './modules/isEmpty/isEmpty.mjs'
+import RaytracerParams from './class/RaytracerParams.mjs'
+import init from './init/default/index.mjs'
+import { refresh } from './system/index.mjs'
+export let run = (object) => {
 
-const CONFIG_DEFAULTS = {
-    // Folder to use for mounting the shared filesystem
-    dirShared: "/shared",
-    // Folder to use for mounting File/Blob objects to the virtual file system
-    dirMounted: "/mnt",
-    // Folder to use for symlinks (basically, we make a symlink to each file mounted on WORKERFS
-    // so that operations like "samtools index" don't crash due to the read-only nature of WORKERS).
-    // Also mount URLs lazily in that folder.
-    dirData: "/data",
-    // Interleave stdout/stderr. If set to false, `.exec()` returns an object { "stdout": <text>, "stderr": <text> }
-    printInterleaved: true,
+    function refreshWindow(timestamp) {
 
-    callback: null,
+        console.log('this---->',this)
+        // redraw only if some render parameter change (user move mose, push button etc.)
+        if(!locked) {
+            locked = true;
+            let par = raytracerParams.getParams();
+            let r = raytracerParams.calcRayBase(); // {E, P1M, Bn, Vn};
 
-    // Debugging
-    debug: false,
-    env: "prd",
-    fs: {
-        worker: { },
-        idbfs: { },
-        api: { }
-    },
-    terminate: () => { }
-};
-
-let create = async (object) => {
-    if(! await object.fs.api.is.dir(object.dirMounted)) {
-        await object.fs.api.mkdir(object.dirMounted);
-    }
-    if(! await object.fs.api.is.dir(object.dirShared)) {
-        await object.fs.api.mkdir(object.dirShared);
-    }
-    if(! await object.fs.api.is.dir(`${object.dirShared}${object.dirData}`)) {
-        await object.fs.api.mkdir(`${object.dirShared}${object.dirData}`);
-    }
-    if(! await object.fs.api.is.dir(`${object.dirShared}${object.dirMounted}`)) {
-        await object.fs.api.mkdir(`${object.dirShared}${object.dirMounted}`);
-    }
-    return object
-}
-
-export let WORKERFS = (object = {}) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            object = Object.assign({}, CONFIG_DEFAULTS, object);
-            let Module = await init({ wasmBinary: bytecode })
-            object.fs.worker = await Module.FS
-            object.fs.api = await api.WORKERFS(object)
-            await create(object)
-            resolve(new Proxy(object.fs.api, {
-                get: (obj, prop) => {
-                    console.log((obj[prop]) ? prop : "process")
-                    return obj[prop];
-                },
-                set: (obj, prop, value) => {
-                    console.log(prop, (obj[prop]) ? value : "process")
-                    if(isEmpty(obj[prop])){
-                        obj[prop] = []
-                    }
-                    obj[prop] = value;
-                    return true
-                }}))
-        } catch (e) {
-            reject(e)
+            raytracer(
+                par.ray.calcLight, par.ray.rayMaxSteps, par.ray.rayMinDist,
+                r.E.x, r.E.y, r.E.z,
+                r.P1M.x, r.P1M.y, r.P1M.z,
+                r.QX.x, r.QX.y, r.QX.z,
+                r.QY.x, r.QY.y, r.QY.z,
+                par.light.x, par.light.y, par.light.z,
+            );
         }
-    })
-}
+        
+        window.requestAnimationFrame(refreshWindow);
+    }
 
-export let IDBFS = (object = { }) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            object = Object.assign({}, CONFIG_DEFAULTS, object);
-            let Module = await init({ wasmBinary: bytecode })
-            object.fs.idbfs = await Module.FS;
-            object.fs.api = await api.IDBFS(object);
-            await create(object)
-            let mount = `${object.dirShared}${object.dirData}`
-            await object.fs.api.mount(object.fs.idbfs.filesystems.IDBFS,  mount, {})
-            await object.fs.api.fs.load();
-            object.terminate = () => {
-                if(window) {
-                    window.onbeforeunload = function () {
-                        object.fs.api.fsSave()
-                    };
-                } else {
-                    console.log('неопределённое поведение')
-                }
-            }
-            resolve(new Proxy(object.fs.api,{
-                get: (obj, prop) => {
-                    console.log((obj[prop]) ? prop : "process")
-                    return obj[prop];
-                },
-                set: (obj, prop, value) => {
-                    console.log(prop, (obj[prop]) ? value : "process")
-                    if(isEmpty(obj[prop])){
-                        obj[prop] = []
-                    }
-                    obj[prop] = value;
-                    return true
-                }}))
-        } catch (e) {
-            reject(e)
-        }
-    })
-}
+    function refreshScreenSize() {
+        //raytracerParams.setScreenSize(window.innerWidth, window.innerHeight);
+        raytracerParams.setScreenSize(500, 500);
+        console.log('init', init)
+        raytracer = init.initFractalGPU(raytracerParams);
+        refresh();
+    }
 
+    let raytracerParams = new RaytracerParams();
+    let tmpMouseWhellY = -3000;
+    let locked = false;
+    let start;
+    refreshScreenSize();
+
+    init.initGui(raytracerParams);
+
+    window.requestAnimationFrame(refreshWindow);
+}
 export default pkg
