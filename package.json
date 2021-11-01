@@ -32,8 +32,5 @@
   },
   "devDependencies": {
     "parcel": "2.0.0-rc.0"
-  },
-  "dependencies": {
-    "redux": "^4.1.1"
   }
 }
